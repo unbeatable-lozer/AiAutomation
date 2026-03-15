@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Test output
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Screenshots
+screenshots/
+*.png
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# TestRail mappings (can be auto-generated)
+.testrail-mappings.json
+
+# Coverage
+coverage/

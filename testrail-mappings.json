@@ -1,0 +1,34 @@
+{
+  "mappings": [
+    {
+      "testId": "login page loads",
+      "caseId": 1234,
+      "filePath": "src/tests/example.test.ts",
+      "title": "Login page loads successfully"
+    },
+    {
+      "testId": "user can login with valid credentials",
+      "caseId": 1235,
+      "filePath": "src/tests/example.test.ts",
+      "title": "User can login with valid credentials"
+    },
+    {
+      "testId": "invalid credentials show error",
+      "caseId": 1236,
+      "filePath": "src/tests/example.test.ts",
+      "title": "Invalid credentials show error message"
+    },
+    {
+      "testId": "form validation requires all fields",
+      "caseId": 1237,
+      "filePath": "src/tests/example.test.ts",
+      "title": "Form validation requires all fields"
+    },
+    {
+      "testId": "navigation to signup page",
+      "caseId": 1238,
+      "filePath": "src/tests/example.test.ts",
+      "title": "Navigation to signup page works"
+    }
+  ]
+}

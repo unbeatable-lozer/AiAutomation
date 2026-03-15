@@ -1,0 +1,48 @@
+{
+  "name": "ai-web-test-framework",
+  "version": "1.0.0",
+  "description": "AI-powered web test automation framework with TestRail integration",
+  "main": "dist/index.js",
+  "scripts": {
+  "test": "playwright test",
+  "test:headed": "playwright test --headed",
+  "test:ui": "playwright test --ui",
+  "test:ai": "playwright test --project=ai",
+  "test:debug": "playwright test --debug",
+  "sync-testrail": "node dist/scripts/sync-testrail.js",
+  "testrail:run": "node dist/scripts/run-testrail-tests.js",
+  "testrail:run:case": "node dist/scripts/run-testrail-tests.js",
+  "build": "tsc",
+  "lint": "eslint src --ext .ts",
+  "prepare": "npm run build"
+},
+  "keywords": [
+    "testing",
+    "automation",
+    "playwright",
+    "ai",
+    "testrail",
+    "selenium"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@playwright/test": "^1.42.0",
+    "dotenv": "^16.4.5",
+    "openai": "^4.28.0",
+    "pixelmatch": "^5.3.0",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/pixelmatch": "^5.2.6",
+    "@types/pngjs": "^6.0.5",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
