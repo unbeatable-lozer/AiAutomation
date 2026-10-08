@@ -100,14 +100,15 @@ export default defineConfig({
       use: { ...devices['iPhone 12'] },
     },
     
-    // AI-powered tests (uses GPT-4 for element detection and visual testing)
+    // AI-powered tests (natural-language element finding and visual testing).
+    // Headless by default; run with HEADED=true to watch the browser.
     {
       name: 'ai',
       use: { 
         ...devices['Desktop Chrome'],
-        headless: false
+        headless: process.env.HEADED !== 'true'
       },
-      testMatch: '**/*.ai.test.ts'
+      testMatch: '**/ai-*.test.ts'
     }
   ],
   

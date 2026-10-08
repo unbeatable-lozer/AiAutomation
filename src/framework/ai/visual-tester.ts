@@ -3,34 +3,36 @@
  * 
  * Uses AI to compare screenshots and provide intelligent diff analysis.
  */
-// @ts-nocheck
 
 import { Page, BrowserContext } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import OpenAI from 'openai';
+import { LlmClient, createLlmClient } from './llm-client';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
-import { VisualComparisonResult, AIConfig, DEFAULT_AI_CONFIG } from './types';
+import { VisualComparisonResult, AIConfig } from './types';
+import { resolveAiConfig } from './config';
 
 export class AIVisualTester {
   private page: Page;
   private context: BrowserContext;
-  private client: OpenAI | null = null;
+  private llm: LlmClient | null;
   private config: AIConfig;
   private baselineDir: string;
 
-  constructor(page: Page, context: BrowserContext, config?: Partial<AIConfig>) {
+  /**
+   * @param page Playwright page used for screenshots
+   * @param context Browser context the page belongs to
+   * @param config AI configuration, defaults to the resolved environment config
+   * @param llm Pre-built LLM client. Omit it to build one from config;
+   *            pass null to disable AI analysis for this instance.
+   */
+  constructor(page: Page, context: BrowserContext, config?: Partial<AIConfig>, llm?: LlmClient | null) {
     this.page = page;
     this.context = context;
-    this.config = { ...DEFAULT_AI_CONFIG, ...config };
+    this.config = { ...resolveAiConfig(), ...config };
     this.baselineDir = process.env.SCREENSHOT_DIR || './screenshots/baseline';
-
-    if (this.config.enabled && this.config.apiKey) {
-      this.client = new OpenAI({
-        apiKey: this.config.apiKey
-      });
-    }
+    this.llm = llm === undefined ? createLlmClient(this.config) : llm;
 
     // Ensure baseline directory exists
     if (!fs.existsSync(this.baselineDir)) {
@@ -120,12 +122,13 @@ export class AIVisualTester {
         };
       }
 
-      const diff = new PNG(currentImg.width, currentImg.height);
-      // @ts-ignore - pixelmatch types are incorrect
+      const diff = new PNG({ width: currentImg.width, height: currentImg.height });
       const numDiffPixels = pixelmatch(
         baselineImg.data,
         currentImg.data,
-        diff.data
+        diff.data,
+        currentImg.width,
+        currentImg.height
       );
 
       const totalPixels = currentImg.width * currentImg.height;
@@ -154,7 +157,9 @@ export class AIVisualTester {
    * Analyze screenshot differences using AI
    */
   async analyzeDifferences(current: Buffer, baseline: Buffer): Promise<string | null> {
-    if (!this.client) {
+    const llm = this.llm;
+
+    if (!llm) {
       return null;
     }
 
@@ -169,26 +174,9 @@ Analyze these two screenshots and explain the visual differences:
 2. Is this change intentional or a bug?
 3. What specific elements are different?
 
-First image (current):
-Second image (baseline):
+The first image is the current state, the second image is the recorded baseline.
 `;
-
-      const response = await this.client.chat.completions.create({
-        model: 'gpt-4-vision-preview',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: `data:image/png;base64,${currentBase64}` } },
-              { type: 'image_url', image_url: { url: `data:image/png;base64,${baselineBase64}` } }
-            ]
-          }
-        ],
-        max_tokens: 500
-      });
-
-      return response.choices[0]?.message?.content || null;
+      return await llm.completeWithImages(prompt, [currentBase64, baselineBase64], { maxTokens: 500 });
     } catch (error) {
       console.error('AI visual analysis error:', error);
       return null;

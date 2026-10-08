@@ -18,10 +18,13 @@ This guide provides detailed instructions for QA engineers on how to effectively
 
 To use AI-powered testing features, you need to:
 
-1. Set up your OpenAI API key in the `.env` file:
+1. Set up your LLM provider in the `.env` file:
    ```env
-   OPENAI_API_KEY=your-openai-api-key-here
+   LLM_API_KEY=your-api-key-here
    ENABLE_AI=true
+   # Optional: point at any OpenAI-compatible endpoint, e.g. a local Ollama server
+   # LLM_BASE_URL=http://localhost:11434/v1
+   # LLM_MODEL=llama3.1
    ```
 
 2. Install dependencies:
@@ -47,11 +50,11 @@ When AI is enabled, your tests receive an `ai` fixture with these methods:
 
 ### How It Works
 
-The AI element finder uses OpenAI's GPT-4 to interpret natural language descriptions and convert them to CSS selectors or XPath expressions. It employs multiple strategies:
+The AI element finder uses the configured LLM provider to interpret natural language descriptions and convert them to CSS selectors or XPath expressions. It employs multiple strategies:
 
 1. **Exact Matching**: Tries to find elements using precise selectors based on the description
 2. **Fuzzy Matching**: Uses partial text matching and contextual clues
-3. **AI Interpretation**: Sends the description and page content to OpenAI for interpretation
+3. **AI Interpretation**: Sends the description and page content to the configured LLM provider for interpretation
 4. **Fallback**: Uses semantic HTML attributes as a last resort
 
 ### Usage Examples
@@ -232,7 +235,7 @@ test.ai('update baseline for intentional changes', async ({ page, ai }) => {
 The AI page analysis feature:
 
 1. Captures the visible text content and structure of the page
-2. Sends this information to OpenAI with a prompt to analyze the page
+2. Sends this information to the configured LLM provider with a prompt to analyze the page
 3. Returns structured information about:
    - Page title and purpose
    - Main content areas
@@ -493,7 +496,7 @@ test.ai('robust test with fallback strategy', async ({ page, ai }) => {
 
 **Symptoms:**
 - Tests with AI features take significantly longer
-- API rate limiting errors from OpenAI
+- API rate limiting errors from the configured LLM provider
 - Tests time out waiting for AI responses
 
 **Solutions:**
@@ -501,7 +504,7 @@ test.ai('robust test with fallback strategy', async ({ page, ai }) => {
 - Batch AI requests when testing similar elements
 - Consider using a faster AI model for less critical tests
 - Run AI-heavy tests in parallel to offset latency
-- Monitor API usage and consider upgrading your OpenAI plan
+- Monitor API usage and consider a local model server or a provider with higher limits
 
 #### 4. TestRail Integration Issues
 
@@ -650,8 +653,9 @@ You can customize the AI behavior by modifying the configuration in `src/framewo
 // Example: Using a different model or adjusting sensitivity
 export const CUSTOM_AI_CONFIG: AIConfig = {
   enabled: true,
-  apiKey: process.env.OPENAI_API_KEY || '',
-  model: 'gpt-4-turbo', // or 'gpt-3.5-turbo' for faster/cheaper
+  apiKey: process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || '',
+  baseUrl: process.env.LLM_BASE_URL, // omit for OpenAI, set it for a local server
+  model: 'gpt-4-turbo', // any model your provider offers
   temperature: 0.2, // Lower for more consistent results
   maxRetries: 5,
   enableSelfHealing: true,

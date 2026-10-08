@@ -8,7 +8,8 @@ import { test as base, expect as baseExpect, Page, BrowserContext } from '@playw
 import * as dotenv from 'dotenv';
 import { AIElementFinder } from './ai/element-finder';
 import { AIVisualTester } from './ai/visual-tester';
-import { AIConfig, DEFAULT_AI_CONFIG } from './ai/types';
+import { AIConfig } from './ai/types';
+import { resolveAiConfig } from './ai/config';
 
 dotenv.config();
 
@@ -48,11 +49,8 @@ export { baseExpect as expect };
 export const test = base.extend<AITestFixture>({
   ai: async ({ page, context }, use) => {
     // Create AI utilities
-    const aiConfig: AIConfig = {
-      ...DEFAULT_AI_CONFIG,
-      enabled: process.env.ENABLE_AI === 'true',
-      apiKey: process.env.OPENAI_API_KEY || ''
-    };
+    // Resolved per fixture so environment changes are picked up at run time
+    const aiConfig: AIConfig = resolveAiConfig();
 
     const elementFinder = new AIElementFinder(page, aiConfig);
     const visualTester = new AIVisualTester(page, context, aiConfig);

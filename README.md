@@ -55,7 +55,7 @@ src/
 - Node.js 16+
 - Playwright browsers (`npx playwright install`)
 - TestRail account
-- OpenAI API key (for AI features)
+- An API key for an LLM provider, or a local model server (see [Choosing an LLM provider](#choosing-an-llm-provider))
 
 ### Installation
 
@@ -79,9 +79,12 @@ src/
    TESTRAIL_PROJECT_ID=1
    TESTRAIL_SUITE_ID=1
 
-   # AI Configuration
+   # AI Configuration - any OpenAI-compatible provider
    ENABLE_AI=true
-   OPENAI_API_KEY=your_openai_api_key
+   LLM_API_KEY=your_provider_api_key
+   # Leave LLM_BASE_URL empty for OpenAI, or point it at a local server:
+   # LLM_BASE_URL=http://localhost:11434/v1
+   # LLM_MODEL=llama3.1
    ```
 
 ### Usage
@@ -180,7 +183,33 @@ ENABLE_AI=true npm run testrail:run
 | `TESTRAIL_PROJECT_ID` | Project ID in TestRail | Yes |
 | `TESTRAIL_SUITE_ID` | Suite ID in TestRail (optional) | No |
 | `ENABLE_AI` | Enable AI features (`true`/`false`) | No (defaults to false) |
-| `OPENAI_API_KEY` | OpenAI API key for AI features | Yes if `ENABLE_AI=true` |
+| `LLM_API_KEY` | API key for the configured LLM provider | Yes if `ENABLE_AI=true` |
+| `LLM_BASE_URL` | Base URL of an OpenAI-compatible endpoint | No (defaults to OpenAI) |
+| `LLM_MODEL` | Text model name | No (defaults to `gpt-4`) |
+| `LLM_VISION_MODEL` | Vision model for screenshot analysis | No (defaults to `gpt-4o`) |
+| `OPENAI_API_KEY` | Legacy alias, used when `LLM_API_KEY` is unset | No |
+
+### Choosing an LLM provider
+
+The AI features talk to any OpenAI-compatible endpoint. Only the base URL and
+model name change - no code changes, and no extra dependency:
+
+| Provider | `LLM_BASE_URL` | Notes |
+|----------|-----------------|-------|
+| OpenAI | *(leave empty)* | Default |
+| Ollama | `http://localhost:11434/v1` | Local, offline; `LLM_MODEL=llama3.1` |
+| LM Studio | `http://localhost:1234/v1` | Local, offline |
+| vLLM | `http://localhost:8000/v1` | Self-hosted |
+| DeepSeek | `https://api.deepseek.com/v1` | OpenAI-compatible |
+| Groq | `https://api.groq.com/openai/v1` | OpenAI-compatible |
+
+For a model that is not OpenAI-compatible at all, implement the `LlmClient`
+interface from `src/framework/ai/llm-client.ts` and pass it to
+`AIElementFinder` / `AIVisualTester` as the last constructor argument.
+
+Note that page text and screenshots go to whichever provider you configure.
+For real test data, prefer a local model server. Vision analysis additionally
+requires a multimodal model (`LLM_VISION_MODEL`).
 
 ### Playwright Configuration
 See `playwright.config.ts` for browser options, timeouts, and test settings.
@@ -249,7 +278,7 @@ test('dashboard visual validation', async ({ page }) => {
 ### AI Element Finder
 1. Tries exact selectors (CSS, XPath)
 2. Attempts fuzzy matching (partial text, attributes)
-3. Uses OpenAI GPT-4 to analyze page and find element
+3. Uses the configured LLM to analyze the page and find the element
 4. Falls back to semantic selectors (data-testid, aria-label)
 5. Caches successful selectors for future use
 

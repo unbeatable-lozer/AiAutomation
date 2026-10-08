@@ -5,25 +5,56 @@
  * Includes self-healing capabilities for resilient test execution.
  */
 
-import { Page, Locator } from '@playwright/test';
-import OpenAI from 'openai';
-import { AIElementDescription, AIElementResult, AIConfig, DEFAULT_AI_CONFIG } from './types';
+import { Page } from '@playwright/test';
+import { AIElementDescription, AIElementResult, AIConfig } from './types';
+import { LlmClient, createLlmClient } from './llm-client';
+import { resolveAiConfig } from './config';
+
+/**
+ * Extract a JSON object from a model response, tolerating the markdown code
+ * fences and surrounding prose that non-OpenAI models commonly return.
+ */
+function parseJsonObject(text: string | null): any {
+  if (!text) {
+    return null;
+  }
+
+  const cleaned = text.replace(/```(?:json)?/gi, '').trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  }
+}
 
 export class AIElementFinder {
   private page: Page;
-  private client: OpenAI | null = null;
   private config: AIConfig;
+  private llm: LlmClient | null;
   private locatorCache: Map<string, string> = new Map();
 
-  constructor(page: Page, config?: Partial<AIConfig>) {
+  /**
+   * @param page Playwright page to search
+   * @param config AI configuration, defaults to the resolved environment config
+   * @param llm Pre-built LLM client. Omit it to build one from config;
+   *            pass null to disable AI for this instance.
+   */
+  constructor(page: Page, config?: Partial<AIConfig>, llm?: LlmClient | null) {
     this.page = page;
-    this.config = { ...DEFAULT_AI_CONFIG, ...config };
-    
-    if (this.config.enabled && this.config.apiKey) {
-      this.client = new OpenAI({
-        apiKey: this.config.apiKey
-      });
-    }
+    this.config = { ...resolveAiConfig(), ...config };
+    this.llm = llm === undefined ? createLlmClient(this.config) : llm;
   }
 
   /**
@@ -45,7 +76,7 @@ export class AIElementFinder {
     }
 
     // Use AI to find element
-    if (this.config.enabled && this.client) {
+    if (this.llm) {
       return await this.findWithAI(description);
     }
 
@@ -168,10 +199,18 @@ export class AIElementFinder {
    * Use AI to find the element
    */
   private async findWithAI(description: AIElementDescription): Promise<AIElementResult> {
+    const llm = this.llm;
+
+    if (!llm) {
+      return {
+        found: false,
+        method: 'ai',
+        confidence: 0,
+        error: 'AI features are disabled or no LLM provider is configured'
+      };
+    }
+
     try {
-      // Get page HTML for context
-      const html = await this.page.content();
-      
       // Get visible text content
       const bodyText = await this.page.evaluate(() => document.body.innerText);
 
@@ -187,13 +226,8 @@ ${bodyText.substring(0, 2000)}
 Return ONLY the selector (no explanation). If uncertain, return "NOT_FOUND".
 `;
 
-      const response = await this.client!.chat.completions.create({
-        model: this.config.model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3
-      });
-
-      const selector = response.choices[0]?.message?.content?.trim() || '';
+      const selector =
+        (await llm.complete([{ role: 'user', content: prompt }], { temperature: 0.3 })) || '';
       
       if (selector && selector !== 'NOT_FOUND') {
         const locator = this.page.locator(selector);
@@ -252,7 +286,9 @@ Return ONLY the selector (no explanation). If uncertain, return "NOT_FOUND".
    * Self-heal a broken locator
    */
   async healLocator(failedLocator: string, pageState?: string): Promise<string | null> {
-    if (!this.config.enableSelfHealing || !this.client) {
+    const llm = this.llm;
+
+    if (!this.config.enableSelfHealing || !llm) {
       return null;
     }
 
@@ -270,13 +306,9 @@ ${pageState ? `Previous state: ${pageState}` : ''}
 Find a new CSS selector or XPath that would find the same element. Return ONLY the new selector.
 `;
 
-      const response = await this.client.chat.completions.create({
-        model: this.config.model,
-        messages: [{ role: 'user', content: prompt }],
+      const newSelector = await llm.complete([{ role: 'user', content: prompt }], {
         temperature: 0.3
       });
-
-      const newSelector = response.choices[0]?.message?.content?.trim();
       
       if (newSelector && newSelector !== failedLocator) {
         // Verify the new locator works
@@ -298,12 +330,13 @@ Find a new CSS selector or XPath that would find the same element. Return ONLY t
    * Analyze the page and suggest test targets
    */
   async analyzePage(): Promise<any> {
-    if (!this.client) {
+    const llm = this.llm;
+
+    if (!llm) {
       return null;
     }
 
     try {
-      const html = await this.page.content();
       const bodyText = await this.page.evaluate(() => document.body.innerText);
 
       const prompt = `
@@ -321,14 +354,11 @@ ${bodyText.substring(0, 3000)}
 Return a JSON object with arrays for each category.
 `;
 
-      const response = await this.client.chat.completions.create({
-        model: this.config.model,
-        messages: [{ role: 'user', content: prompt }],
+      const analysis = await llm.complete([{ role: 'user', content: prompt }], {
         temperature: 0.5
       });
 
-      const analysis = response.choices[0]?.message?.content;
-      return JSON.parse(analysis || '{}');
+      return parseJsonObject(analysis);
     } catch (error) {
       console.error('Page analysis error:', error);
       return null;

@@ -125,14 +125,26 @@ export interface PageAnalysis {
 
 /**
  * AI Configuration
+ *
+ * Provider-agnostic: any OpenAI-compatible endpoint can back the AI features.
+ * Environment resolution lives in ./config.ts.
  */
 export interface AIConfig {
   /** Enable AI features */
   enabled: boolean;
-  /** OpenAI API key */
+  /** API key for the configured provider */
   apiKey: string;
-  /** Model to use */
-  model: 'gpt-4' | 'gpt-4-turbo' | 'gpt-3.5-turbo';
+  /**
+   * Base URL of an OpenAI-compatible endpoint.
+   * Leave undefined to use the OpenAI default (https://api.openai.com/v1).
+   */
+  baseUrl?: string;
+  /** Text model name (provider specific) */
+  model: string;
+  /** Vision model used for screenshot analysis, defaults to `model` */
+  visionModel?: string;
+  /** Extra headers required by the provider (for example Azure api-version) */
+  headers?: Record<string, string>;
   /** Temperature for generation */
   temperature: number;
   /** Maximum retries for element finding */
@@ -144,17 +156,3 @@ export interface AIConfig {
   /** Screenshot threshold for visual testing */
   visualThreshold: number;
 }
-
-/**
- * Default AI configuration
- */
-export const DEFAULT_AI_CONFIG: AIConfig = {
-  enabled: process.env.ENABLE_AI === 'true',
-  apiKey: process.env.OPENAI_API_KEY || '',
-  model: 'gpt-4',
-  temperature: 0.7,
-  maxRetries: 3,
-  enableSelfHealing: true,
-  enableVisualTesting: true,
-  visualThreshold: 0.1
-};
